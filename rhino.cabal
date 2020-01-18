@@ -53,6 +53,7 @@ library
   ghc-options:          -Wall
 
 executable rhino
+  hs-source-dirs:       exe
   main-is:              Main.hs
   build-depends:        aeson,
                         base,
@@ -61,10 +62,24 @@ executable rhino
                         rhino,
                         optparse-applicative < 0.16,
                         text
-  hs-source-dirs:       exe
   default-language:     Haskell2010
   default-extensions:   NoImplicitPrelude
                         OverloadedStrings
                         RecordWildCards
                         ScopedTypeVariables
                         TupleSections
+  ghc-options:          -Wall
+
+test-suite rhino-test
+  type:                 exitcode-stdio-1.0
+  hs-source-dirs:       test
+  main-is:              Rhino.hs
+  build-depends:        base,
+                        containers,
+                        rhino,
+                        tasty < 1.3,
+                        tasty-hunit < 0.11
+  default-language:     Haskell2010
+  default-extensions:   NoImplicitPrelude
+                        OverloadedStrings
+  ghc-options:          -Wall -Wno-missing-signatures
