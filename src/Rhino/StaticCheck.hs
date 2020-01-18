@@ -55,21 +55,30 @@ type StaticEnv = Map Identifier Declaration
 -- | Check that a module's 'redef' definition actually redefine symbols that
 -- would otherwise be imported
 --
--- Returns the set of redefined symbols.
+-- Returns the set of redefined symbols, including input declarations that
+-- override imported inputs.
 checkRedefs ::
      [(Import, StaticEnv)]
   -> Module
   -> Either (Contextual StaticError) (Set Identifier)
 checkRedefs is Module {..}
-  | null nonRedefs = return redefs
+  | null nonRedefs = return $ redefs <> inputOverrides
   | otherwise = throwError $ Context Nothing $ IncorrectRedefs nonRedefs
   where
+    -- All imported symbols
     importedSyms = foldMap (Map.keysSet . snd) is
+
+    -- Local definitions marked as `redef`
     redefs =
       Set.fromList [defName | DefDecl Definition {redef = True, ..} <- program]
+
+    -- Symbols from `redef` that aren't actually *re*defining anything
     nonRedefs = Set.toList $ Set.difference redefs importedSyms
-      -- Definitions marked as `redef` that aren't actually *re*defining
-      -- anything
+
+    -- Input declarations that override imported inputs
+    inputOverrides = Set.intersection
+      (Set.fromList [nameOf i | InputDecl i <- program])
+      importedSyms
 
 -- | Select between alternative import statements
 --
