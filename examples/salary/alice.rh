@@ -1,0 +1,9 @@
+import salary/tax
+
+input net_salary_for_alice
+  label: Net salary for Alice
+end
+
+def salary_alice
+  net_salary_for_alice * (1 - tax_rate)
+end

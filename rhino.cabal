@@ -1,0 +1,70 @@
+name:                 rhino
+version:              0.1
+synopsis:             A DSL for defining functions on structured data
+-- description:
+license:              BSD3
+license-file:         LICENSE
+author:               Emil Axelsson
+maintainer:           78emil@gmail.com
+copyright:            2020 Emil Axelsson
+category:             Language
+build-type:           Simple
+cabal-version:        >=1.10
+extra-source-files:
+
+library
+  exposed-modules:      Data.DAG
+                        Rhino.AST
+                        Rhino.Error
+                        Rhino.Evaluate
+                        Rhino.InputProperties
+                        Rhino.Load
+                        Rhino.Parser
+                        Rhino.Prelude
+                        Rhino.Reachability
+                        Rhino.StaticCheck
+                        Rhino.Type
+                        Rhino.Utils
+  build-depends:        aeson < 1.5,
+                        base < 4.14,
+                        basic-prelude < 0.8,
+                        containers < 0.7,
+                        directory < 1.4,
+                        filepath < 1.5,
+                        megaparsec < 8.1,
+                        mtl < 2.3,
+                        parser-combinators < 1.3,
+                        protolude < 0.3,
+                        scientific < 0.4,
+                        text < 1.3
+  hs-source-dirs:       src
+  default-language:     Haskell2010
+  default-extensions:   DeriveFunctor
+                        FlexibleContexts
+                        FlexibleInstances
+                        NoImplicitPrelude
+                        OverloadedStrings
+                        Rank2Types
+                        RecordWildCards
+                        ScopedTypeVariables
+                        StandaloneDeriving
+                        TupleSections
+                        TypeFamilies
+  ghc-options:          -Wall
+
+executable rhino
+  main-is:              Main.hs
+  build-depends:        aeson,
+                        base,
+                        bytestring < 0.11,
+                        containers,
+                        rhino,
+                        optparse-applicative < 0.16,
+                        text
+  hs-source-dirs:       exe
+  default-language:     Haskell2010
+  default-extensions:   NoImplicitPrelude
+                        OverloadedStrings
+                        RecordWildCards
+                        ScopedTypeVariables
+                        TupleSections

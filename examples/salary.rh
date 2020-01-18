@@ -1,0 +1,12 @@
+# Calculate salary for Alice and Bob
+
+import salary/alice
+import salary/bob
+
+def total_salary
+  salary_bob + salary_alice
+end
+
+def main
+  total_salary
+end
