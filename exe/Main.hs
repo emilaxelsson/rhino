@@ -30,14 +30,11 @@ mainWrapper m = do
   exitSuccess
 
 data RhinoError
-  = ReachabilityWithoutTarget
-  | InputEnvFormatError String
+  = InputEnvFormatError String
   | MissingInputVariables [Identifier]
   deriving (Show)
 
 instance Exception RhinoError where
-  displayException ReachabilityWithoutTarget =
-    "Reachability analysis requires supplying a target variable."
   displayException (InputEnvFormatError aesonErr) = unlines
     ["Incorrectly formatted input environment; should be a JSON-formatted record with string keys."
     , ""
@@ -99,12 +96,10 @@ describeInputs Options {..} modules = do
   inps <-
     fmap (fmap inputProps) $
     either throwIO return $ inputProperties $ unAnnnotateDAG modules
-  if reachable
-    then case target of
-           Nothing -> throwIO ReachabilityWithoutTarget
-           Just res ->
-             return (inps `Map.restrictKeys` reachableInputs modules res)
-    else return inps
+  return $ if reachable
+    then let res = fromMaybe "main" target
+          in inps `Map.restrictKeys` reachableInputs modules res
+    else inps
   where
     inputProps Input {..} = Map.fromList $ catMaybes
       [ flip fmap inputType $ ("type", ) . unIdentifier

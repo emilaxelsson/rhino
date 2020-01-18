@@ -34,7 +34,7 @@ Available options:
 The `examples` folder contains a small toy program divided into a few different modules. In order to run it, we need to know what its inputs are. We can ask Rhino about that:
 
 ```
-> rhino -i examples/ examples/salary.rh --list-inputs --reachable --target main | jq
+> rhino -i examples/ examples/salary.rh --list-inputs --reachable | jq
 {
   "net_salary_for_alice": {
     "label": "Net salary for Alice"
