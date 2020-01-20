@@ -28,12 +28,21 @@ mainWrapper m = do
     exitFailure
   exitSuccess
 
+test_modules = unsafePerformIO $
+  loadAndCheckProgam ["examples"] "examples/test.rh"
+
 salary_modules = unsafePerformIO $
   loadAndCheckProgam ["examples"] "examples/salary.rh"
 
+{-# NOINLINE test_modules #-}
 {-# NOINLINE salary_modules #-}
 
-testTree = testGroup "Rhino tests"
+test_tests =
+  [ testCase "evaluate" $
+      evaluate mempty test_modules "test_add" @?= Integer 9
+  ]
+
+salary_tests =
   [ testCase "inputProperties" $
       case inputProperties (unAnnnotateDAG salary_modules) of
         Right inps ->
@@ -64,9 +73,14 @@ testTree = testGroup "Rhino tests"
           , ("tax_rate",             Float   0.3)
           ]
      in testCase "evaluate" $
-          evaluate env salary_modules "main" @?=
-          Float 28000
+          evaluate env salary_modules "main" @?= Float 28000
   ]
+
+testTree =
+  testGroup "Rhino tests" $
+    [ testGroup "test.rh"   test_tests
+    , testGroup "salary.rh" salary_tests
+    ]
 
 main :: IO ()
 main = mainWrapper $ defaultMain testTree
