@@ -6,6 +6,7 @@ import qualified Prelude
 import Control.Exception (catch)
 import qualified Data.Map as Map
 import System.Exit (exitFailure, exitSuccess)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Rhino.Evaluate
 import Rhino.InputProperties
@@ -27,10 +28,14 @@ mainWrapper m = do
     exitFailure
   exitSuccess
 
-testTree modules = testGroup "Rhino tests" $
+salary_modules = unsafePerformIO $
+  loadAndCheckProgam ["examples"] "examples/salary.rh"
 
+{-# NOINLINE salary_modules #-}
+
+testTree = testGroup "Rhino tests"
   [ testCase "inputProperties" $
-      case inputProperties (unAnnnotateDAG modules) of
+      case inputProperties (unAnnnotateDAG salary_modules) of
         Right inps ->
           Map.keys inps @?=
           [ "net_salary_for_alice"
@@ -41,13 +46,13 @@ testTree modules = testGroup "Rhino tests" $
 
   , testGroup "reachableInputs" $
       [ testCase "for all" $
-          sort (toList $ reachableInputs modules "main") @?=
+          sort (toList $ reachableInputs salary_modules "main") @?=
           [ "net_salary_for_alice"
           , "net_salary_for_bob"
           , "tax_rate"
           ]
       , testCase "for Bob" $
-          sort (toList $ reachableInputs modules "salary_bob") @?=
+          sort (toList $ reachableInputs salary_modules "salary_bob") @?=
           [ "net_salary_for_bob"
           , "tax_rate"
           ]
@@ -59,11 +64,9 @@ testTree modules = testGroup "Rhino tests" $
           , ("tax_rate",             Float   0.3)
           ]
      in testCase "evaluate" $
-          evaluate env modules "main" @?=
+          evaluate env salary_modules "main" @?=
           Float 28000
   ]
 
 main :: IO ()
-main = mainWrapper $ do
-  modules <- loadAndCheckProgam ["examples"] "examples/salary.rh"
-  defaultMain $ testTree modules
+main = mainWrapper $ defaultMain testTree
