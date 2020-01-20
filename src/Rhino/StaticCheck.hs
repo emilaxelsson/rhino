@@ -10,7 +10,6 @@ import Rhino.Prelude
 
 import Control.Monad.Except (throwError)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import Data.DAG
 import Rhino.AST
@@ -18,8 +17,7 @@ import Rhino.Error
 import Rhino.Utils
 
 data StaticError
-  = IncorrectRedefs [Identifier]
-  | ImportConflict (Declaration, Import) (Declaration, Import)
+  = ImportConflict (Declaration, Import) (Declaration, Import)
   | DefinitionCycle [Identifier]
   | DuplicateDefinitions [Identifier]
   | VariableNotInScope Identifier
@@ -52,34 +50,6 @@ instance Exception e => Exception (Contextual e) where
 --------------------------------------------------------------------------------
 
 type StaticEnv = Map Identifier Declaration
-
--- | Check that a module's 'redef' definition actually redefine symbols that
--- would otherwise be imported
---
--- Returns the set of redefined symbols, including input declarations that
--- override imported inputs.
-checkRedefs ::
-     [(Import, StaticEnv)]
-  -> Module
-  -> Either (Contextual StaticError) (Set Identifier)
-checkRedefs is Module {..}
-  | null nonRedefs = return $ redefs <> inputOverrides
-  | otherwise = throwError $ Context Nothing $ IncorrectRedefs nonRedefs
-  where
-    -- All imported symbols
-    importedSyms = foldMap (Map.keysSet . snd) is
-
-    -- Local definitions marked as `redef`
-    redefs =
-      Set.fromList [defName | DefDecl Definition {redef = True, ..} <- program]
-
-    -- Symbols from `redef` that aren't actually *re*defining anything
-    nonRedefs = Set.toList $ Set.difference redefs importedSyms
-
-    -- Input declarations that override imported inputs
-    inputOverrides = Set.intersection
-      (Set.fromList [nameOf i | InputDecl i <- program])
-      importedSyms
 
 -- | Select between alternative import statements
 --
@@ -162,9 +132,7 @@ checkModuleNetwork impEnv Module {..} =
 -- | This function does several things:
 --
 -- * Resolves the module's imports
--- * Checks that `redef` is only used to override existing symbols
--- * Checks that the same symbol is not declared multiple times (unless `redef`
---   is used)
+-- * Checks that the same symbol is not declared multiple times
 -- * Checks that all referenced variables are in scope
 -- * Checks that there are no cycles in the definitions
 -- * Returns the module's local and exported environments
@@ -174,15 +142,7 @@ checkModule ::
   -> Either (Contextual StaticError) (StaticEnv, StaticEnv)
        -- ^ (local, exported)
 checkModule is modul = do
-  redefs <- checkRedefs is modul
-  let is' = map (second $ flip Map.withoutKeys redefs) is
-        -- Remove overridden symbols from the imports. Two reasons for this:
-        -- 1. To prevent import resolution from complaining about conflicting
-        --    imports when those will anyway be overridden
-        -- 2. To get them out of the way in the environment passed to
-        --    `checkModuleNetwork`. Otherwise they would lead to
-        --    'DuplicateDefinitions'.
-  importedEnv <- resolveMergedImports $ mergeImports is'
+  importedEnv <- resolveMergedImports $ mergeImports is
   let importedEnv' = fst <$> importedEnv
   checkModuleNetwork importedEnv' modul
   let localDecls   = Map.fromListWith oops [(nameOf d, d) | d <- program modul]

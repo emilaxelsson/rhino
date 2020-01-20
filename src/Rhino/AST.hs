@@ -94,8 +94,7 @@ data LocalDef = LocalDef
   } deriving (Eq, Show)
 
 data Definition = Definition
-  { redef     :: Bool
-  , defLoc    :: SourcePos
+  { defLoc    :: SourcePos
   , defScope  :: Scope
   , defName   :: Identifier
   , defArgs   :: [Identifier]

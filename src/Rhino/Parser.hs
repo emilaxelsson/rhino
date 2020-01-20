@@ -29,7 +29,6 @@ data Keyword
   | TYPE
   | LABEL
   | DEF
-  | REDEF
   | END
   | TRUE
   | FALSE
@@ -234,11 +233,8 @@ localDef = LocalDef <$> (identifier <* symbol "=") <*> expression
 
 definition :: Parser Definition
 definition = do
-  (re, defScope) <- second (fromMaybe Public) <$>
-    (   fmap (False, ) (scopedKeyword DEF)
-    <|> fmap (True, )  (scopedKeyword REDEF)
-    )
-  Definition re
+  defScope <- fromMaybe Public <$> scopedKeyword DEF
+  Definition
     <$> getSourcePos
     <*> pure defScope
     <*> identifier
