@@ -3,9 +3,8 @@ module Main where
 import Rhino.Prelude
 import qualified Prelude
 
-import Control.Exception (catch)
+import Control.Exception (catch, throwIO)
 import qualified Data.Map as Map
-import System.Exit (exitFailure, exitSuccess)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Rhino.Evaluate
@@ -19,19 +18,21 @@ import Rhino.AST
 import Test.Tasty
 import Test.Tasty.HUnit
 
-newtype TestError = TestError String
+newtype DisplayError = DisplayError String
 
-mainWrapper :: IO a -> IO a
-mainWrapper m = do
-  void $ m `catch` \(e :: SomeException) -> do
-    Prelude.putStrLn $ displayException e
-    exitFailure
-  exitSuccess
+instance Show DisplayError where
+  show (DisplayError msg) = msg
 
-test_modules = unsafePerformIO $
+instance Exception DisplayError
+
+displayError :: IO a -> IO a
+displayError m = m `catch` \(e :: SomeException) ->
+  throwIO $ DisplayError $ displayException e
+
+test_modules = unsafePerformIO $ displayError $
   loadAndCheckProgam ["examples"] "examples/test.rh"
 
-salary_modules = unsafePerformIO $
+salary_modules = unsafePerformIO $ displayError $
   loadAndCheckProgam ["examples"] "examples/salary.rh"
 
 {-# NOINLINE test_modules #-}
@@ -83,4 +84,4 @@ testTree =
     ]
 
 main :: IO ()
-main = mainWrapper $ defaultMain testTree
+main = defaultMain testTree
