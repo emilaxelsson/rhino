@@ -3,6 +3,7 @@ module Rhino.StaticCheck
   , Contextual (..)
   , StaticEnv
   , checkProgram
+  , checkProgramWithTarget
   ) where
 
 import Rhino.Prelude
@@ -271,3 +272,20 @@ checkProgram modules =
     return (localEnv, exportedEnv)
   where
     modules' = annotatedDAG () modules
+
+checkProgramWithTarget ::
+     DAG ModulePath Module
+  -> Identifier -- ^ Variable holding the result
+  -> Either (Contextual StaticError)
+       ( DAG ModulePath (Annotated Module (StaticEnv, StaticEnv))
+       ) -- ^ (local, exported)
+checkProgramWithTarget modules result = do
+  checked <- checkProgram modules
+  let Annotated (localEnv, _) _ = root checked
+  case Map.lookup result localEnv of
+    Nothing -> throwError $ Context Nothing $ VariableNotInScope result
+    Just d -> do
+      let ar = arity d
+      when (ar /= 0) $ throwError $ Context Nothing $
+        ArityError result $ Mismatch {expected = 0, got = ar}
+  return checked

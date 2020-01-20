@@ -119,11 +119,11 @@ readInputEnv = do
 main :: IO ()
 main = mainWrapper $ do
   opts@Options {..} <- execParser parseOptionsH
-  modules <- loadAndCheckProgam includes programFile
+  let tgt = fromMaybe "main" target
+  modules <- loadAndCheckProgamWithTarget includes programFile tgt
   if listInputs
     then LBS.putStr . Aeson.encode =<< describeInputs opts modules
     else do
-      let tgt = fromMaybe "main" target
       requiredInps <-
         describeInputs opts {target = Just tgt, reachable = True} modules
       env <- readInputEnv

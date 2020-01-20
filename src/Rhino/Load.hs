@@ -4,6 +4,7 @@ module Rhino.Load
   , readModule
   , loadProgam
   , loadAndCheckProgam
+  , loadAndCheckProgamWithTarget
   ) where
 
 import Rhino.Prelude
@@ -101,3 +102,15 @@ loadAndCheckProgam
 loadAndCheckProgam includes rootFile = do
   mods <- loadProgam includes rootFile
   either (throwIO . StaticError) return $ checkProgram mods
+
+-- | Load a Rhino module and all of its transitive imports
+--
+-- May throw a 'LoadError' IO exception.
+loadAndCheckProgamWithTarget
+  :: [FilePath] -- ^ Include paths
+  -> FilePath -- ^ Root module
+  -> Identifier -- ^ Variable holding the result
+  -> IO (DAG ModulePath (Annotated Module (StaticEnv, StaticEnv)))
+loadAndCheckProgamWithTarget includes rootFile result = do
+  mods <- loadProgam includes rootFile
+  either (throwIO . StaticError) return $ checkProgramWithTarget mods result
