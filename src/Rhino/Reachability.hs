@@ -10,16 +10,19 @@ import qualified Data.Set as Set
 import Data.DAG
 import Rhino.AST
 import Rhino.StaticCheck
-import Rhino.Utils
 
 type Env = Map Identifier (Set Identifier)
 
 reachExp :: Env -> Expression -> Set Identifier
 reachExp env = go
   where
-    go (Variable v) = lookupChecked v env
+    go (Variable v) = fold $ Map.lookup v env
+      -- `fold` will return the empty set for failed lookups. Lookup failure is
+      -- expected because function arguments are missing from the environment.
+      -- (The static checker has already checked that variables are referred to
+      -- correctly.)
     go (BinOp _ a b) = go a <> go b
-    go (FunCall f as) = foldMap go as <> lookupChecked f env
+    go (FunCall f as) = foldMap go as <> fold (Map.lookup f env)
     go (Literal _) = Set.empty
 
 bindLocalDef :: Env -> LocalDef -> Env

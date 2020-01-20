@@ -206,7 +206,9 @@ instance HasVars Expression where
       go (FunCall _ as) = foldMap go as
 
 instance HasVars Definition where
-  freeVars Definition {..} = foldr' local (freeVars defResult) defBody
+  freeVars Definition {..} = Set.difference
+    (foldr' local (freeVars defResult) defBody)
+    (Set.fromList defArgs)
     where
       local LocalDef {..} vs = Set.delete lhs vs <> freeVars rhs
 
