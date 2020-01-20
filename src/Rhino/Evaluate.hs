@@ -97,11 +97,9 @@ evalBinOp Div   = fracOp (/)
 evalExp :: EvalEnv -> Expression -> Literal
 evalExp env = go
   where
---     go (Variable v) = case lookupChecked v env of
-    go (Variable v) = case Map.lookup v env of
-      Just (Val lit) -> lit
-      Just (Closure env' decl) -> evalDef env' decl []
-      Nothing -> error $ show (v, Map.keys env)
+    go (Variable v) = case lookupChecked v env of
+      Val lit -> lit
+      Closure env' decl -> evalDef env' decl []
     go (Literal lit) = lit
     go (BinOp op a b) = evalBinOp op (go a) (go b)
     go (FunCall f as) = case lookupChecked f env of
