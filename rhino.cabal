@@ -83,4 +83,4 @@ test-suite rhino-test
   default-extensions:   NoImplicitPrelude
                         OverloadedStrings
                         ScopedTypeVariables
-  ghc-options:          -Wall -Wno-missing-signatures
+  ghc-options:          -Wall

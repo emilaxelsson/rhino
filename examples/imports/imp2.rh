@@ -1,0 +1,6 @@
+import a (aaa)
+import b (bbb)
+
+def main
+  aaa + bbb
+end
