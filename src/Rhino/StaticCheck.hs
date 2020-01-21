@@ -10,6 +10,7 @@ import Rhino.Prelude
 
 import Control.Monad.Except (throwError)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import Data.DAG
 import Rhino.AST
@@ -18,30 +19,37 @@ import Rhino.Utils
 
 data StaticError
   = ImportConflict (Declaration, Import) (Declaration, Import)
+  | ModuleDoesNotExport ModulePath [Identifier]
   | DefinitionCycle [Identifier]
   | DuplicateDefinitions [Identifier]
   | VariableNotInScope Identifier
   | ArityError Identifier (Mismatch Arity Arity)
   | DuplicatedArgNames [Identifier]
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance Exception StaticError
 
-data Contextual a = Context (Maybe Declaration) a
-  deriving (Show)
+data Contextual a
+  = NoContext a
+  | LocatedContext SourcePos a
+  | DeclContext Declaration a
+  deriving (Eq, Show)
 
 instance Exception e => Exception (Contextual e) where
-  displayException (Context cxt a) = case cxt of
-    Nothing -> displayException a
-    Just decl ->
-      let inTheDecl = case decl of
-            InputDecl _ -> "In the input declaration"
-            DefDecl _   -> "In the definition of"
-       in unlines
-            [ sourcePosPretty (location decl)
-            , inTheDecl ++ " '" ++ toS (unIdentifier $ nameOf decl) ++ "':"
-            , displayException a
-            ]
+  displayException (NoContext a) = displayException a
+  displayException (LocatedContext pos a) = unlines
+    [ sourcePosPretty pos
+    , displayException a
+    ]
+  displayException (DeclContext decl a) = unlines
+    [ sourcePosPretty (location decl)
+    , inTheDecl ++ " '" ++ toS (unIdentifier $ nameOf decl) ++ "':"
+    , displayException a
+    ]
+    where
+      inTheDecl = case decl of
+        InputDecl _ -> "In the input declaration"
+        DefDecl _   -> "In the definition of"
 
 
 
@@ -78,17 +86,38 @@ resolveDecl (a@InputDecl{}, i) (InputDecl{}, j) = return (a, resolveImport i j)
   -- don't care about metadata here, because it is propagated using a different
   -- mechanism: input metadata is always exported, whether or not the input
   -- symbol is.
-resolveDecl a b = throwError $ Context Nothing $ ImportConflict a b
+resolveDecl a b = throwError $ NoContext $ ImportConflict a b
+
+-- | Apply import filters ('ImportFilter') to an exported environment
+filterEnv ::
+     Import
+  -> Map Identifier a -- ^ Full environment from the imported module
+  -> Either (Contextual StaticError) (Map Identifier a)
+filterEnv Import {..} env = case importFilter of
+  Nothing -> return env
+  Just (flt, _)
+    | not (null dodgy) -> throwError $
+        LocatedContext importLoc $ ModuleDoesNotExport importPath dodgy
+    | otherwise -> return $ case flt of
+        Only   -> env `Map.restrictKeys` vs
+        Except -> env `Map.withoutKeys` vs
+  where
+    vs = Set.fromList $ maybe [] snd importFilter -- filter variables
+    dodgy = Set.toList $ Set.difference vs (Map.keysSet env)
 
 -- | Merge a list of imports and return a mapping from imported symbols to
 -- declarations
 mergeImports ::
      [(Import, StaticEnv)]
        -- ^ Imports paired with the imported module's exported environment
-  -> Map Identifier (NonEmpty (Declaration, Import))
+  -> Either (Contextual StaticError) (Map Identifier (NonEmpty (Declaration, Import)))
        -- ^ Each imported symbol mapped to its declarations
-mergeImports is =
-  Map.unionsWith (<>) [fmap (\d -> pure (d, i)) env | (i, env) <- is]
+mergeImports is = do
+  envs <- sequence
+    [ fmap (\d -> pure (d, i)) <$> filterEnv i env
+    | (i, env) <- is
+    ]
+  return $ Map.unionsWith (<>) envs
 
 -- | Process the result from 'mergeImports' by resolving identifiers mapping to
 -- multiple declarations
@@ -98,9 +127,9 @@ resolveMergedImports ::
 resolveMergedImports = traverse $ foldM1 resolveDecl
 
 liftDagError :: DagError Declaration Identifier -> Contextual StaticError
-liftDagError (Cycle vs)           = Context Nothing $ DefinitionCycle vs
-liftDagError (DuplicateNodes vs)  = Context Nothing $ DuplicateDefinitions vs
-liftDagError (DanglingEdge cxt v) = Context (Just cxt) $ VariableNotInScope v
+liftDagError (Cycle vs)           = NoContext $ DefinitionCycle vs
+liftDagError (DuplicateNodes vs)  = NoContext $ DuplicateDefinitions vs
+liftDagError (DanglingEdge cxt v) = DeclContext cxt $ VariableNotInScope v
 
 mkInput :: Declaration -> Input
 mkInput decl = Input
@@ -142,7 +171,7 @@ checkModule ::
   -> Either (Contextual StaticError) (StaticEnv, StaticEnv)
        -- ^ (local, exported)
 checkModule is modul = do
-  importedEnv <- resolveMergedImports $ mergeImports is
+  importedEnv <- resolveMergedImports =<< mergeImports is
   let importedEnv' = fst <$> importedEnv
   checkModuleNetwork importedEnv' modul
   let localDecls   = Map.fromListWith oops [(nameOf d, d) | d <- program modul]
@@ -175,7 +204,7 @@ checkArityVariable ::
 checkArityVariable env cxt v n =
   when (expectedArity /= n) $
   throwError $
-  Context (Just $ DefDecl cxt) $ ArityError v $ Mismatch expectedArity n
+  DeclContext (DefDecl cxt) $ ArityError v $ Mismatch expectedArity n
   where
     expectedArity = lookupChecked v env
 
@@ -204,7 +233,7 @@ checkArityDecl env (DefDecl def@Definition {..}) = do
   -- Check for duplicated arguments
   let dupArgs = duplicates defArgs
   unless (null dupArgs) $
-    throwError $ Context (Just $ DefDecl def) $ DuplicatedArgNames dupArgs
+    throwError $ DeclContext (DefDecl def) $ DuplicatedArgNames dupArgs
   -- Make a local environment from outer environment + arguments
   let argEnv = Map.fromList $ zip defArgs $ repeat 0
       env'   = argEnv `Map.union` env -- left-biased
@@ -243,9 +272,9 @@ checkProgramWithTarget modules result = do
   checked <- checkProgram modules
   let Annotated (localEnv, _) _ = root checked
   case Map.lookup result localEnv of
-    Nothing -> throwError $ Context Nothing $ VariableNotInScope result
+    Nothing -> throwError $ NoContext $ VariableNotInScope result
     Just d -> do
       let ar = arity d
-      when (ar /= 0) $ throwError $ Context Nothing $
+      when (ar /= 0) $ throwError $ NoContext $
         ArityError result $ Mismatch {expected = 0, got = ar}
   return checked

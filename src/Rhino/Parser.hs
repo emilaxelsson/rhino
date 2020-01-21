@@ -25,6 +25,7 @@ data Keyword
   = PUBLIC
   | PRIVATE
   | IMPORT
+  | HIDING
   | INPUT
   | TYPE
   | LABEL
@@ -198,9 +199,13 @@ path = followLexeme $ fromString <$> some (wordChar <|> char '/')
 
 importDecl :: Parser Import
 importDecl = do
-  importScope <- fromMaybe Private <$> scopedKeyword IMPORT
-  importLoc   <- getSourcePos
-  importPath  <- coerce path
+  importScope  <- fromMaybe Private <$> scopedKeyword IMPORT
+  importLoc    <- getSourcePos
+  importPath   <- coerce path
+  importFilter <- optional $ choice
+    [ keyword HIDING *> ((Except, ) <$> tuple identifier)
+    , (Only, ) <$> tuple identifier
+    ]
   return Import {..}
 
 inputTypeDecl :: Parser Identifier

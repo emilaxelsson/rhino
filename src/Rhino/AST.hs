@@ -67,10 +67,16 @@ data Scope
   | Private
   deriving (Eq, Show)
 
+data ImportFilter
+  = Only
+  | Except
+  deriving (Eq, Show)
+
 data Import = Import
-  { importLoc   :: SourcePos
-  , importScope :: Scope
-  , importPath  :: ModulePath
+  { importLoc    :: SourcePos
+  , importScope  :: Scope
+  , importPath   :: ModulePath
+  , importFilter :: Maybe (ImportFilter, [Identifier])
   } deriving (Eq, Show)
 
 data Input = Input
